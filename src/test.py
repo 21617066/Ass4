@@ -48,6 +48,7 @@ print("Max score(ll): " + str(np.max(ll)) + " with seq: " + str(seq[np.argmax(ll
 ll_sum = np.log(np.exp(ll[0]) + np.exp(ll[1]) + np.exp(ll[2]))
 print("ll_total: " + str(ll_sum))
 
+print(toy_hmm.forward(signal4))
 # toy_means = [d.get_mean() for d in toy_hmm.dists]
 # toy_covs = [d.get_cov() for d in toy_hmm.dists]
 # print ('Transition probabilities: ')

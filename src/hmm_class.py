@@ -438,8 +438,33 @@ class HMM(object):
         ll : float
             The log-likelihood associated with the observation under the model.
         '''
-        # TODO: Implement this function
-        pass        
+        T = signal.shape[1]
+        N = len(dists)
+        l_alpha = np.full((N+1,T+1), -np.inf)
+        l_alpha[-1,-1] = 0 # Initialize log alpha
+        for j in range(N):
+            for t in range(T):
+                ll_xs = np.log(dists[j].likelihood([signal[:,t]]))
+
+                ll_sum = -np.inf # Initialize log sum
+                if t == 0:
+                    a = trans[-1,j]
+                    # if a != 0:
+                    ll_sum = np.logaddexp(ll_sum, np.log(a))
+                else:
+                    for i in range(N):
+                        a = trans[i,j]                    
+                        # if a != 0:
+                        ll_sum = np.logaddexp(ll_sum, np.log(a) + l_alpha[i, t-1])
+                l_alpha[j,t] = ll_xs + ll_sum
+        
+        ll = -np.inf # Initialize log sum
+        for j in range(N):
+            a = trans[j,N]
+            # if a != 0:
+            ll = np.logaddexp(ll, np.log(a) + l_alpha[j,T-1])
+            
+        return ll
 
     def _calcstates(self, trans, dists):
         '''
