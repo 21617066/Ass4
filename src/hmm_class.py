@@ -392,12 +392,12 @@ class HMM(object):
         s_terminate = np.unique(seq).shape[0]
         ll = np.log(trans[-1,0])
         for t in range(T):
-            likelihood_xs = dists[seq[t]].likelihood([signal[:,t]])
+            ll_xs = dists[seq[t]].loglik([signal[:,t]])
             if t != T-1:
                 a = trans[seq[t], seq[t+1]]
             else:
                 a = trans[seq[t], s_terminate]
-            ll += np.log(likelihood_xs) + np.log(a)
+            ll += ll_xs + np.log(a)
         
         return ll
         
@@ -440,28 +440,28 @@ class HMM(object):
         '''
         T = signal.shape[1]
         N = len(dists)
+        
+        # Initialize log alpha
         l_alpha = np.full((N+1,T+1), -np.inf)
-        l_alpha[-1,-1] = 0 # Initialize log alpha
+        l_alpha[-1,-1] = 0
+        
         for j in range(N):
             for t in range(T):
-                ll_xs = np.log(dists[j].likelihood([signal[:,t]]))
+                ll_xs = dists[j].loglik([signal[:,t]])
 
                 ll_sum = -np.inf # Initialize log sum
                 if t == 0:
                     a = trans[-1,j]
-                    # if a != 0:
                     ll_sum = np.logaddexp(ll_sum, np.log(a))
                 else:
                     for i in range(N):
                         a = trans[i,j]                    
-                        # if a != 0:
                         ll_sum = np.logaddexp(ll_sum, np.log(a) + l_alpha[i, t-1])
                 l_alpha[j,t] = ll_xs + ll_sum
         
         ll = -np.inf # Initialize log sum
         for j in range(N):
             a = trans[j,N]
-            # if a != 0:
             ll = np.logaddexp(ll, np.log(a) + l_alpha[j,T-1])
             
         return ll
