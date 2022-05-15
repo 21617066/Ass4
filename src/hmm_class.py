@@ -631,7 +631,7 @@ class HMM(object):
         samples = np.empty(0)
         states = np.empty(0)
         state = -1
-        while state != self.trans.shape[0]-1:
+        while state != self.trans.shape[0]-2:
             sample, state = draw_discrete_sample(self.trans[state])
             samples = np.append(samples, sample)
             states = np.append(states, state)
