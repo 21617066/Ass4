@@ -27,7 +27,10 @@ print(states)
 
 signal3 = np.array([[ 0.9515792,   0.9832767,   1.04633007,  1.01464327,  0.98207072,  1.01116689,
   0.31622856,  0.20819263,  3.57707616]])
+signal4 = np.array([[ 1,   0.6,   0.5 , 3.57707616]]) 
+
 print(toy_hmm.score(signal3, np.array([0, 0, 0, 0, 0, 1, 1, 1, 2])))
+print(toy_hmm.score(signal4, np.array([0,1,1,2])))
 
 # toy_means = [d.get_mean() for d in toy_hmm.dists]
 # toy_covs = [d.get_cov() for d in toy_hmm.dists]

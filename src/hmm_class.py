@@ -389,12 +389,15 @@ class HMM(object):
         '''
         
         T = seq.shape[0]
-        ll = 0
-        for t in range(T-1):
+        s_terminate = np.unique(seq).shape[0]
+        ll = np.log(trans[-1,0])
+        for t in range(T):
             likelihood_xs = dists[seq[t]].likelihood([signal[:,t]])
-            a = trans[seq[t]][seq[t+1]]
+            if t != T-1:
+                a = trans[seq[t], seq[t+1]]
+            else:
+                a = trans[seq[t], s_terminate]
             ll += np.log(likelihood_xs) + np.log(a)
-        ll += np.log(trans[-1,0])
         
         return ll
         
