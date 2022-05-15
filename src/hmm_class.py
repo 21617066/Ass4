@@ -13,6 +13,7 @@ Initial version created on Mar 28, 2012
 
 from warnings import warn
 import numpy as np
+from random import random
 from gaussian import Gaussian
 np.seterr(divide="ignore")
 
@@ -386,8 +387,18 @@ class HMM(object):
         ll : float
             The log-likelihood associated with the observation and state sequence under the model.
         '''
-        pass
-
+        
+        T = seq.shape[0]
+        ll = 0
+        for t in range(T-1):
+            likelihood_xs = dists[seq[t]].likelihood([signal[:,t]])
+            a = trans[seq[t]][seq[t+1]]
+            ll += np.log(likelihood_xs) + np.log(a)
+        ll += np.log(trans[-1,0])
+        
+        return ll
+        
+    
     def forward(self, signal):
         '''
         See documentation for _forward()
@@ -595,7 +606,9 @@ class HMM(object):
                 
             Returns
             -------
-            sample: int
+            sample: float
+                The random sample used to find sample_disc (based on disc_prob)
+            sample_disc: int
                 The discrete sample.
                 Note: sample takes on the values in the set {0,1,n-1}, where
                 n is the the number of discrete probabilities.
@@ -608,10 +621,20 @@ class HMM(object):
             y = np.array(range(len(x)))
             fn = interpolate.interp1d(x,y)           
             r = np.random.rand(1)
-            return np.array(np.floor(fn(r)),dtype=int)[0]
+            return r, np.array(np.floor(fn(r)),dtype=int)[0]
         #######################################################################
+        # Using the function defined above, draw samples from the HMM 
         
-        pass # Using the function defined above, draw samples from the HMM 
+        samples = np.empty(0)
+        states = np.empty(0)
+        state = -1
+        while state != self.trans.shape[0]-1:
+            sample, state = draw_discrete_sample(self.trans[state])
+            samples = np.append(samples, sample)
+            states = np.append(states, state)
+        
+        return samples, states
+        
 
 if __name__ == "__main__":
     import doctest
