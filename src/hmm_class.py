@@ -343,7 +343,39 @@ class HMM(object):
         ll : float
             The log-likelihood associated with the sequence
         '''
+        T = signal.shape[1]
+        N = len(dists)
         
+        # Initialize log alpha
+        l_alpha = np.full((N+1,T+1), -np.inf)
+        l_alpha[-1,-1] = 0
+        b = np.full((N,T),-1)        
+        for t in range(T):
+            for j in range(N):
+                ll_xs = dists[j].loglik([signal[:,t]])
+
+                temp = np.empty((N+1,1))
+                for i in range(-1, N):
+                    l_a = np.log(trans[i,j])
+                    temp[i] = l_a + l_alpha[i,t-1]
+                l_alpha[j,t] = ll_xs + np.max(temp)
+                if t != 0:
+                    b[j,t] = np.argmax(temp)
+        
+        temp = np.empty((N,1))
+        for j in range(N):
+            l_a = np.log(trans[j,N])
+            temp[j] = l_a + l_alpha[j,T-1]
+        ll = np.max(temp)
+        b_final = np.argmax(temp)
+        
+        seq = np.zeros((T,)).astype(int)
+        seq[T-1] = b_final
+        for t in range(T-2,0, -1):
+            seq[t] = b[seq[t+1], t+1]
+            
+        return seq, ll
+    
         pass
         # In this function, you may want to take log 0 and obtain -inf.
         # To avoid warnings about this, you can use np.seterr.
@@ -444,25 +476,20 @@ class HMM(object):
         # Initialize log alpha
         l_alpha = np.full((N+1,T+1), -np.inf)
         l_alpha[-1,-1] = 0
-        
-        for j in range(N):
-            for t in range(T):
+        for t in range(T):
+            for j in range(N):
                 ll_xs = dists[j].loglik([signal[:,t]])
 
                 ll_sum = -np.inf # Initialize log sum
-                if t == 0:
-                    a = trans[-1,j]
-                    ll_sum = np.logaddexp(ll_sum, np.log(a))
-                else:
-                    for i in range(N):
-                        a = trans[i,j]                    
-                        ll_sum = np.logaddexp(ll_sum, np.log(a) + l_alpha[i, t-1])
+                for i in range(-1,N):
+                    l_a = np.log(trans[i,j])
+                    ll_sum = np.logaddexp(ll_sum, l_a + l_alpha[i, t-1])
                 l_alpha[j,t] = ll_xs + ll_sum
         
         ll = -np.inf # Initialize log sum
         for j in range(N):
-            a = trans[j,N]
-            ll = np.logaddexp(ll, np.log(a) + l_alpha[j,T-1])
+            l_a = np.log(trans[j,N])
+            ll = np.logaddexp(ll, l_a + l_alpha[j,T-1])
             
         return ll
 

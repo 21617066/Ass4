@@ -22,33 +22,45 @@ dists = [Gaussian(mean=np.array([means[i]]), cov=np.array([[covs[i]]])) for i in
 toy_hmm.load(trans, dists)
 
 samples, states = toy_hmm.sample()
-print(samples)
-print(states)
+# print(samples)
+# print(states)
 
-signal3 = np.array([[ 0.9515792,   0.9832767,   1.04633007,  1.01464327,  0.98207072,  1.01116689,
-  0.31622856,  0.20819263,  3.57707616]])
-signal4 = np.array([[ 1,   0.6,   0.5 , 3.57707616]]) 
+# signal3 = np.array([[ 0.9515792,   0.9832767,   1.04633007,  1.01464327,  0.98207072,  1.01116689,
+#   0.31622856,  0.20819263,  3.57707616]])
+# signal4 = np.array([[ 1,   0.6,   0.5 , 3.57707616]]) 
 
-print(toy_hmm.score(signal3, np.array([0, 0, 0, 0, 0, 1, 1, 1, 2])))
-print(toy_hmm.score(signal4, np.array([0,1,1,2])))
+# print(toy_hmm.score(signal3, np.array([0, 0, 0, 0, 0, 1, 1, 1, 2])))
+# print(toy_hmm.score(signal4, np.array([0,1,1,2])))
 
-scores = np.empty(0)
-ll = np.empty((3,1))
-seq = np.array([[0,0,1,2], [0,1,1,2], [0,1,2,2]])
+# scores = np.empty(0)
+# ll = np.empty((3,1))
+# seq = np.array([[0,0,1,2], [0,1,1,2], [0,1,2,2]])
 
-ll[0] = toy_hmm.score(signal4, seq[0])
-ll[1] = toy_hmm.score(signal4, seq[1])
-ll[2] = toy_hmm.score(signal4, seq[2])
+# ll[0] = toy_hmm.score(signal4, seq[0])
+# ll[1] = toy_hmm.score(signal4, seq[1])
+# ll[2] = toy_hmm.score(signal4, seq[2])
 
-print("ll1: " + str(ll[0]) + " likelihood: " + str(np.exp(ll[0])))
-print("ll2: " + str(ll[1]) + " likelihood: " + str(np.exp(ll[1])))
-print("ll3: " + str(ll[2]) + " likelihood: " + str(np.exp(ll[2])))
-print("Max score(ll): " + str(np.max(ll)) + " with seq: " + str(seq[np.argmax(ll)]))
+# print("ll1: " + str(ll[0]) + " likelihood: " + str(np.exp(ll[0])))
+# print("ll2: " + str(ll[1]) + " likelihood: " + str(np.exp(ll[1])))
+# print("ll3: " + str(ll[2]) + " likelihood: " + str(np.exp(ll[2])))
+# print("Max score(ll): " + str(np.max(ll)) + " with seq: " + str(seq[np.argmax(ll)]))
 
-ll_sum = np.log(np.exp(ll[0]) + np.exp(ll[1]) + np.exp(ll[2]))
-print("ll_total: " + str(ll_sum))
+# ll_sum = np.log(np.exp(ll[0]) + np.exp(ll[1]) + np.exp(ll[2]))
+# print("ll_total: " + str(ll_sum))
 
-print(toy_hmm.forward(signal4))
+# print(toy_hmm.forward(signal4))
+
+signal5 = np.array([[ 0.9515792,   0.9832767,   1.04633007,  1.01464327,  1.98207072,  1.01116689,
+  0.31622856,  0.20819263,  2.57707616]])
+seq5, ll5 = toy_hmm.viterbi(signal5)
+print(seq5)
+print(ll5)
+
+# signal6 = np.array([[ 1,   0.6,   1.9773 , 2.653997]]) 
+# seq6, ll6 = toy_hmm.viterbi(signal6)
+# print(seq6)
+# print(ll6)
+
 # toy_means = [d.get_mean() for d in toy_hmm.dists]
 # toy_covs = [d.get_cov() for d in toy_hmm.dists]
 # print ('Transition probabilities: ')
