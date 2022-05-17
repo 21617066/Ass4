@@ -13,6 +13,7 @@ Initial version created on Mar 28, 2012
 
 from warnings import warn
 import numpy as np
+from random import random
 from gaussian import Gaussian
 np.seterr(divide="ignore")
 
@@ -342,39 +343,39 @@ class HMM(object):
         ll : float
             The log-likelihood associated with the sequence
         '''
-        delta = np.zeros((len(dists),np.shape(signal)[1]))
-        back_delta = np.zeros_like(delta)
-        seq = np.zeros(np.shape(signal)[1], dtype=int)
+        T = signal.shape[1]
+        N = len(dists)
         
-        # initialise row 0 of delta values, previous option must be state -1
-        for j, dist in enumerate(dists):
-            delta[j,0] = dist.loglik(signal[:,0])+np.log(trans[-1,j])
-            back_delta[j,0] = -1; 
+        # Initialize log alpha
+        l_alpha = np.full((N+1,T+1), -np.inf)
+        l_alpha[-1,-1] = 0
+        b = np.full((N,T),-1)        
+        for t in range(T):
+            for j in range(N):
+                ll_xs = dists[j].loglik([signal[:,t]])
+
+                temp = np.empty((N+1,1))
+                for i in range(-1, N):
+                    l_a = np.log(trans[i,j])
+                    temp[i] = l_a + l_alpha[i,t-1]
+                l_alpha[j,t] = ll_xs + np.max(temp)
+                if t != 0:
+                    b[j,t] = np.argmax(temp)
+        
+        temp = np.empty((N,1))
+        for j in range(N):
+            l_a = np.log(trans[j,N])
+            temp[j] = l_a + l_alpha[j,T-1]
+        ll = np.max(temp)
+        b_final = np.argmax(temp)
+        
+        seq = np.zeros((T,)).astype(int)
+        seq[T-1] = b_final
+        for t in range(T-2,0, -1):
+            seq[t] = b[seq[t+1], t+1]
             
-        # populate remaining deltas from 1:N-1
-        for s in range(np.shape(signal)[1]-1):
-            for j, dist in enumerate(dists): # could make this more effecient by checking for zero transitions
-                
-                # get log(p(x|s))
-                delta[j,s+1] = dist.loglik(signal[:,s+1])
-                
-                # calculate the max of the log of a(i,j)*α(s−1,j)
-                l_s_terms = np.log(trans[0:-1,j])+delta[:,s] #TODO check the slicing here
-                delta[j,s+1] += np.max(l_s_terms)
-                back_delta[j,s+1] = np.argmax(l_s_terms)
-                
-        # calculate total log likelihood of sequence
-        fin_l_s = delta[:,-1]+np.log(trans[0:-1,-1]) #TODO check the slicing here
-        ll = np.max(fin_l_s)
-        
-        # back propogate from max ll to get sequence
-        seq[-1] = np.argmax(fin_l_s);
-        for i in range(len(seq)-2,-1,-1):
-            seq[i] = back_delta[seq[i+1],i+1]
-        #TODO remove non emitting state which may be included, theres possibly an off by one error somewhere in the last section
         return seq, ll
-        # In this function, you may want to take log 0 and obtain -inf.
-        # To avoid warnings about this, you can use np.seterr.
+
 
     def score(self, signal, seq):
         '''
@@ -415,17 +416,21 @@ class HMM(object):
         ll : float
             The log-likelihood associated with the observation and state sequence under the model.
         '''
-        ll = 0.0
-        for s_i, s in enumerate(seq):
-            if(s_i != 0):
-                ll += np.log(trans[seq[s_i-1],s])
-                ll += dists[s].loglik(signal[:,s_i])    
+        
+        T = seq.shape[0]
+        s_terminate = np.unique(seq).shape[0]
+        ll = np.log(trans[-1,0])
+        for t in range(T):
+            ll_xs = dists[seq[t]].loglik([signal[:,t]])
+            if t != T-1:
+                a = trans[seq[t], seq[t+1]]
             else:
-                ll += np.log(trans[-1,s])
-                ll += dists[s].loglik(signal[:,s_i])
-        ll += np.log(trans[s,-1])
+                a = trans[seq[t], s_terminate]
+            ll += ll_xs + np.log(a)
+        
         return ll
-
+        
+    
     def forward(self, signal):
         '''
         See documentation for _forward()
@@ -462,35 +467,28 @@ class HMM(object):
         ll : float
             The log-likelihood associated with the observation under the model.
         '''
+        T = signal.shape[1]
+        N = len(dists)
         
-        alpha = np.zeros((len(dists),np.shape(signal)[1]))
-        
-        # initialise row 0 of alpha values as alpha-1 is log(1)=0
-        for j, dist in enumerate(dists):
-            alpha[j,0] = dist.loglik(signal[:,0])+np.log(trans[-1,j])
-            
-        # populate remaining alphas from 1:N-1
-        for s in range(1,np.shape(signal)[1]):
-            for j, dist in enumerate(dists): # could make this more effecient by checking for zero transitions
-                
-                # get log(p(x|s))
-                alpha[j,s] = dist.loglik(signal[:,s])
-                
-                # calculate log of the sum of a(i,j)*α(s−1,j)
-                l_s_terms = np.log(trans[:-1,j])+alpha[:,s-1] #TODO trans indexing could be wrong
-                l_s_max = np.max(l_s_terms)
-                if l_s_max != -np.inf:
-                    alpha[j,s] +=  l_s_max+np.log(np.exp(l_s_terms-l_s_max)@np.ones((len(l_s_terms),1)))
-                else:
-                    alpha[j,s] = -np.inf
-                
-        # calculate total log likelihood
-        l_s_terms = alpha[:,-1]+np.log(trans[:-1,-1])
-        l_s_max = np.max(l_s_terms)
-        ll = l_s_max+np.log(np.exp(l_s_terms-l_s_max)@np.ones((len(l_s_terms),1)))
-        
-        return ll
+        # Initialize log alpha
+        l_alpha = np.full((N+1,T+1), -np.inf)
+        l_alpha[-1,-1] = 0
+        for t in range(T):
+            for j in range(N):
+                ll_xs = dists[j].loglik([signal[:,t]])
 
+                ll_sum = -np.inf # Initialize log sum
+                for i in range(-1,N):
+                    l_a = np.log(trans[i,j])
+                    ll_sum = np.logaddexp(ll_sum, l_a + l_alpha[i, t-1])
+                l_alpha[j,t] = ll_xs + ll_sum
+        
+        ll = -np.inf # Initialize log sum
+        for j in range(N):
+            l_a = np.log(trans[j,N])
+            ll = np.logaddexp(ll, l_a + l_alpha[j,T-1])
+            
+        return ll
 
     def _calcstates(self, trans, dists):
         '''
@@ -499,7 +497,7 @@ class HMM(object):
         
         Calculate the state sequences for each of the given 'signals', maximizing the 
         likelihood of the given parameters of a HMM model. This allocates each of the
-        observations, in all the sequences, to one of the states. 
+        observations, in all the equences, to one of the states. 
     
         Use the state allocation to calculate an updated transition matrix.   
     
@@ -532,45 +530,37 @@ class HMM(object):
         ll : float
             Log-likelihood of all the data
         '''
+        
+        n_obs = self.data.T.shape[0]
+        n_states = len(dists)
         ll = 0
-        seq = np.array([],dtype=int)
-        signal_starts = np.array([], dtype=int)
+        trans_occ = np.zeros_like(trans)
+        state_occ = np.zeros((len(dists),1))
+        states = np.full((n_obs,n_states), False)
+        i_obs = 0
         for sig in self.signals:
-            sig_seq, sig_ll = self._viterbi(sig, trans, dists)
-            ll += sig_ll
-            signal_starts = np.append(signal_starts,len(seq))
-            seq = np.append(seq,sig_seq)
-        
-        n_states = int(np.max(seq))+1
-        redundant_state_num = 0
-        for s in range(n_states):
-            state_occur = np.array(np.where(seq == s))[0,:]
+            [seq, ll_current] = HMM._viterbi(sig, trans, dists)
+            ll += ll_current
             
-            if (redundant_state_num > 0):
-                seq[state_occur] = seq[state_occur] - redundant_state_num
-            
-            if(len(state_occur) == 0):
-                redundant_state_num += 1
-                n_states -= 1
-        
-        states = np.zeros((len(seq), n_states), dtype=bool)
-        states[np.arange(len(seq)),seq] = 1
-        
-        trans = np.zeros((n_states+1,n_states+1))
-        state_totals = np.zeros(n_states)
-        for obs, obs_state in enumerate(seq):
-            if(not obs in signal_starts):
-                 trans[seq[obs-1],obs_state] += 1              
-            else:
-                trans[-1,obs_state] += 1
-                trans[seq[obs-1],-1] += 1 
-                
-            state_totals[obs_state] += 1
-        state_totals = np.append(state_totals, len(signal_starts))
-        trans /= state_totals[:,np.newaxis]
+            T = seq.shape[0]
+            for t in range(T-1):
+                i = seq[t]
+                states[i_obs, i] = True
+                i_obs += 1
+                j = seq[t+1]
+                trans_occ[i,j] += 1
+                state_occ[i] += 1
+            i = seq[T-1]
+            states[i_obs, i] = True
+            i_obs += 1
+        for j in range(trans_occ.shape[1]):
+            if np.sum(trans_occ[:,j]) == 0:
+                trans_occ = np.delete(trans_occ, j, 0)
+                trans_occ = np.delete(trans_occ, j, 1)
+        trans = trans_occ/state_occ
         
         return states, trans, ll
-        # The core of this function involves applying the _viterbi function to each signal stored in the model.
+        pass # The core of this function involves applying the _viterbi function to each signal stored in the model.
         # Remember to remove emitting states not used in the new state allocation.
 
     def _updatecovs(self, states):
@@ -595,45 +585,18 @@ class HMM(object):
             The updated means for each state
         '''
         
-        '''estimate means and covarience'''
-        
-        d = np.shape(self.data)[0]
-        n_states = np.shape(states)[1]
-        covs = np.zeros((n_states, d, d))
+        d = self.data.shape[0]
+        n_states = states.shape[1]
         means = np.zeros((n_states, d))
-        totals = np.zeros((n_states,1), dtype=int)
-        
-        # loop through all the observations, add means
-        for obs, obs_state in enumerate(states):
-            totals += obs_state[:,np.newaxis]
-            means += obs_state[:,np.newaxis] @ self.data[np.newaxis,:,obs]
-        
-        # set states with 0 observatoins to have a 1 total to prevent /0
-        for s in range(np.size(totals)):
-            if(totals[s] == 0): totals[s] = 1
-        
-        # normalize means
-        means /= totals @ np.ones((1,d))
-        
-        # loop through all the observations and calculate covariances
-        for obs, obs_state in enumerate(states):
-            for s in range(np.size(obs_state)):
-                if(obs_state[s] == 1):
-                    obs_centred_data = self.data[:,obs]-means[s,:]
-                    covs[s,:,:] += obs_centred_data[np.newaxis,:] @ obs_centred_data[:,np.newaxis]
-                    
-        # normalize covarience
-        covs /= totals[:,:,np.newaxis]
-
-        # discard off-diagonal elements if set
-        if self.diagcov:
-            covs *= np.eye(d,d)
-        
-        # check for zero covariance matrices and set to identity
-        for s_i, s_cov in enumerate(covs):
-            if not np.all(s_cov):
-                covs[s_i,:,:] = np.eye(d)
-
+        covs = np.zeros((n_states, d, d))
+        for state in range(n_states):
+            i_state_occ = np.where(states[:,state] == True)
+            vals = self.data[:,i_state_occ].T
+            means[state] = np.mean(vals)
+            covs[state] = np.sum((means[state]-vals)**2)/vals.shape[0]
+            
+            
+            
         return covs, means
         # In this method, if a class has no observations, assign it a mean of zero
         # In this method, estimate a full covariance matrix and discard the non-diagonal elements
@@ -689,13 +652,7 @@ class HMM(object):
         converged = False
         iters = 0
         while not converged and iters <  self.maxiters:
-            covs, means = self._updatecovs(oldstates)          
-            dists = [Gaussian(mean=means[i], cov=covs[i]) for i in range(len(covs))] #TODO this len(covs) is sus
-            oldstates, trans, newLL = self._calcstates(trans, dists)
-            if((newLL-oldLL) < self.rtol):
-                converged = True
-            else:
-                oldLL = newLL
+            pass # Perform one iteration of the EM algorithm and test for convergence here
             iters += 1
         if iters >= self.maxiters:
             warn("Maximum number of iterations reached - HMM parameters may not have converged")
@@ -742,7 +699,9 @@ class HMM(object):
                 
             Returns
             -------
-            sample: int
+            sample: float
+                The random sample used to find sample_disc (based on disc_prob)
+            sample_disc: int
                 The discrete sample.
                 Note: sample takes on the values in the set {0,1,n-1}, where
                 n is the the number of discrete probabilities.
@@ -755,27 +714,20 @@ class HMM(object):
             y = np.array(range(len(x)))
             fn = interpolate.interp1d(x,y)           
             r = np.random.rand(1)
-            return np.array(np.floor(fn(r)),dtype=int)[0]
+            return r, np.array(np.floor(fn(r)),dtype=int)[0]
         #######################################################################
-        
-              
-        
-        states = np.array([-1], dtype=int)
-        samples = np.array([])
-        final_state = self.trans.shape[1]-1
-        completed = False
-        while completed == False:
-            newstate = draw_discrete_sample(self.trans[states[-1],:])
-            if newstate != final_state:
-                states = np.append(states, newstate)
-                samples = np.append(samples, self.dists[newstate].sample(1))
-            else:
-                completed = True
-        return samples, states[1::]
-            
-             
-        
         # Using the function defined above, draw samples from the HMM 
+        
+        samples = np.empty(0)
+        states = np.empty(0)
+        state = -1
+        while state != self.trans.shape[0]-2:
+            sample, state = draw_discrete_sample(self.trans[state])
+            samples = np.append(samples, sample)
+            states = np.append(states, state)
+        
+        return samples, states
+        
 
 if __name__ == "__main__":
     import doctest
