@@ -375,10 +375,7 @@ class HMM(object):
             seq[t] = b[seq[t+1], t+1]
             
         return seq, ll
-    
-        pass
-        # In this function, you may want to take log 0 and obtain -inf.
-        # To avoid warnings about this, you can use np.seterr.
+
 
     def score(self, signal, seq):
         '''
@@ -533,7 +530,26 @@ class HMM(object):
         ll : float
             Log-likelihood of all the data
         '''
-
+        
+        
+        ll = -np.inf
+        trans_occ = np.zeros_like(trans)
+        state_occ = np.zeros_like(dists)
+        # states = np.zeros(self.signals[1], dists.shape[0])
+        for sig in self.signals:
+            [seq, ll_current] = self.viterbi(sig)
+            ll += ll_current
+            
+            T = seq.shape[0]
+            for t in range(T-1):
+                i = seq[t]
+                j = seq[t+1]
+                trans_occ[i,j] += 1
+                state_occ[i] += 1
+        
+        trans = trans_occ/state_occ
+        
+        
         pass # The core of this function involves applying the _viterbi function to each signal stored in the model.
         # Remember to remove emitting states not used in the new state allocation.
 
@@ -558,8 +574,20 @@ class HMM(object):
         means: (n_states, d) ndarray
             The updated means for each state
         '''
-
-        pass
+        
+        d = self.data.shape[0]
+        n_states = states.shape[1]
+        means = np.zeros((n_states, d))
+        covs = np.zeros((n_states, d, d))
+        for state in range(n_states):
+            i_state_occ = np.where(states[:,state] == True)
+            vals = self.data[:,i_state_occ].T
+            means[state] = np.mean(vals)
+            covs[state] = np.sum((means[state]-vals)**2)/vals.shape[0]
+            
+            
+            
+        return covs, means
         # In this method, if a class has no observations, assign it a mean of zero
         # In this method, estimate a full covariance matrix and discard the non-diagonal elements
         # if a diagonal covariance matrix is required.
