@@ -531,25 +531,35 @@ class HMM(object):
             Log-likelihood of all the data
         '''
         
-        
-        ll = -np.inf
+        n_obs = self.data.T.shape[0]
+        n_states = len(dists)
+        ll = 0
         trans_occ = np.zeros_like(trans)
-        state_occ = np.zeros_like(dists)
-        # states = np.zeros(self.signals[1], dists.shape[0])
+        state_occ = np.zeros((len(dists),1))
+        states = np.full((n_obs,n_states), False)
+        i_obs = 0
         for sig in self.signals:
-            [seq, ll_current] = self.viterbi(sig)
+            [seq, ll_current] = HMM._viterbi(sig, trans, dists)
             ll += ll_current
             
             T = seq.shape[0]
             for t in range(T-1):
                 i = seq[t]
+                states[i_obs, i] = True
+                i_obs += 1
                 j = seq[t+1]
                 trans_occ[i,j] += 1
                 state_occ[i] += 1
-        
+            i = seq[T-1]
+            states[i_obs, i] = True
+            i_obs += 1
+        for j in range(trans_occ.shape[1]):
+            if np.sum(trans_occ[:,j]) == 0:
+                trans_occ = np.delete(trans_occ, j, 0)
+                trans_occ = np.delete(trans_occ, j, 1)
         trans = trans_occ/state_occ
         
-        
+        return states, trans, ll
         pass # The core of this function involves applying the _viterbi function to each signal stored in the model.
         # Remember to remove emitting states not used in the new state allocation.
 
